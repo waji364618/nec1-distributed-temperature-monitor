@@ -2,7 +2,6 @@ package client.socket;
 
 import client.model.SensorStatistics;
 import client.model.TemperatureSensor;
-import javafx.application.Platform;
 import shared.JsonUtil;
 import shared.Message;
 import shared.MessageType;
@@ -12,162 +11,195 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Random;
-import javafx.scene.control.Label;
-import javafx.scene.control.ListView;
 
+/*
+ * Handles all socket communication
+ * between client and server.
+ *
+ * This class is only responsible
+ * for networking logic.
+ */
 public class ClientSocketManager {
 
-    // Socket forbindelse til server
+    // Socket connection
     private Socket socket;
 
-    // Reader og writer streams
+    // Input and output streams
     private BufferedReader in;
     private PrintWriter out;
 
-    // Bruges til at stoppe threads sikkert
-    private volatile boolean running = true;
+    // Controls thread execution
+    private boolean running = true;
 
-    // Temperatur sensor
+    // Temperature sensor model
     private TemperatureSensor sensor;
 
-    // Statistik system
+    // Statistics model
     private SensorStatistics statistics;
 
+    // Listener used for communication
+    // with the ViewModel
+    private SocketListener listener;
+
+    /*
+     * Constructor creates connection
+     * to server and starts threads.
+     */
     public ClientSocketManager(
             String host,
             int port,
             String sensorId,
-            ListView<String> temperatureList,
-            Label averageLabel,
-            Label highestLabel,
-            Label measurementLabel,
-            Label warningLabel) {
+            SocketListener listener)
+    {
+        this.listener = listener;
+
         System.out.println("Connecting to server...");
 
-        try {
-            // Opret socket forbindelse
+        try
+        {
+            // Create socket connection
             socket = new Socket(host, port);
 
             System.out.println("Connected to server!");
 
-            // Streams
+            // Create streams
             in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
 
             out = new PrintWriter(socket.getOutputStream(), true);
 
-            // Statistik objekt
-            statistics = new SensorStatistics();
-
-            // Sensor objekt
+            // Create sensor and statistics
             sensor = new TemperatureSensor(sensorId, 3000);
+
+            statistics = new SensorStatistics();
 
             Random random = new Random();
 
-
-            // THREAD 1 -> Lyt til server
+            /*
+             * Thread responsible for listening
+             * to messages from server.
+             */
             Thread listenerThread = new Thread(() ->
             {
-                try {
-                    while (running) {
+                try
+                {
+                    while (running)
+                    {
                         String response = in.readLine();
 
-                        if (!running) {
+                        // Connection closed
+                        if (response == null)
+                        {
                             break;
                         }
 
-                        if (response == null) {
-                            break;
-                        }
                         Message serverMessage = JsonUtil.fromJson(response);
 
-                        // Broadcast besked
-                        if (serverMessage.getType() == MessageType.BROADCAST) {
-                            System.out.println("BROADCAST received!");
-
-                            Platform.runLater(() ->
-                            {
-                                temperatureList.getItems().add("BROADCAST: " + serverMessage.getClientId());
-                            });
+                        // Broadcast message
+                        if (serverMessage.getType() == MessageType.BROADCAST)
+                        {
+                            listener.onBroadcastReceived(serverMessage.getClientId());
                         }
 
-                        // Interval ændring
-                        else if (serverMessage.getType() == MessageType.CHANGE_INTERVAL) {sensor.setInterval(
-                                    serverMessage.getInterval());
+                        // Interval update
+                        else if (serverMessage.getType() == MessageType.CHANGE_INTERVAL)
+                        {
+                            sensor.setInterval(serverMessage.getInterval());
 
-                            System.out.println("New interval: " + sensor.getInterval());
+                            listener.onIntervalChanged(sensor.getInterval());
                         }
                     }
-                } catch (IOException e) {
-                    if (running) {
-                        System.out.println("Connection lost.");
+                }
+                catch (IOException e)
+                {
+                    if (running)
+                    {
+                        listener.onConnectionLost();
                     }
                 }
             });
 
             listenerThread.setDaemon(true);
+
             listenerThread.start();
 
-
-            // THREAD 2 -> Send temperaturer
-            while (running) {
-                // Generer temperatur
+            /*
+             * Main loop for sending
+             * temperature data to server.
+             */
+            while (running)
+            {
+                // Generate random temperature
                 double temperature = Math.round((15 + random.nextDouble() * 15) * 100.0) / 100.0;
 
+                // Update sensor
                 sensor.setTemperature(temperature);
 
+                // Update statistics
                 statistics.addTemperature(temperature);
+                listener.onTemperatureGenerated(
+                        temperature,
+                        statistics.getAverageTemperature(),
+                        statistics.getHighestTemperature(),
+                        statistics.getMeasurementCount());
 
-                // Opret temperature message
-                Message message = new Message(MessageType.TEMPERATURE, sensor.getSensorId(), sensor.getTemperature());
+                // Create message
+                Message message = new Message(
+                                MessageType.TEMPERATURE,
+                                sensor.getSensorId(),
+                                sensor.getTemperature());
 
-                // Konverter til JSON
+                // Convert to JSON
                 String json = JsonUtil.toJson(message);
 
-                // Send til server
+                // Send to server
                 out.println(json);
 
-                // Opdater GUI
-                Platform.runLater(() ->
-                {
-                    temperatureList.getItems().add("Temperature: " + temperature);
+                System.out.println("Temperature sent: " + temperature);
 
-                    averageLabel.setText(String.valueOf(Math.round(statistics.getAverageTemperature() * 100.0) / 100.0));
-
-                    highestLabel.setText(String.valueOf(statistics.getHighestTemperature()));
-
-                    measurementLabel.setText(String.valueOf(statistics.getMeasurementCount()));
-                });
-
-                // Vent før næste temperatur
+                // Wait before next measurement
                 Thread.sleep(sensor.getInterval());
             }
-        } catch (IOException | InterruptedException e) {
-            System.out.println("Client stopped.");
+        }
+        catch (IOException e)
+        {
+            System.out.println("Failed to connect to server.");
+        }
+        catch (InterruptedException e)
+        {
+            System.out.println("Thread interrupted.");
         }
     }
 
-    // Luk client korrekt
-    public synchronized void disconnect() {
+    /*
+     * Safely disconnects client
+     * from server.
+     */
+    public void disconnect()
+    {
         running = false;
 
-        try {
-            if (in != null) {
+        try
+        {
+            if (in != null)
+            {
                 in.close();
             }
 
-            if (out != null) {
+            if (out != null)
+            {
                 out.close();
             }
 
-            if (socket != null && !socket.isClosed()) {
+            if (socket != null)
+            {
                 socket.close();
             }
 
-            System.out.println("Client disconnected.");
-        } catch (IOException e) {
-            if (running) {
-                e.printStackTrace();
-            }
+            System.out.println("Disconnected from server.");
+        }
+        catch (IOException e)
+        {
+            System.out.println("Failed to close connection.");
         }
     }
 }
