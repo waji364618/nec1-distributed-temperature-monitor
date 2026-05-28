@@ -4,10 +4,7 @@ import com.google.gson.Gson;
 
 public class JsonUtil {
 
-    // Gson objekt bruges til JSON konvertering
     private static final Gson gson = new Gson();
-
-     // Konverterer Message objekt til JSON string
 
     public static String toJson(Message message)
     {

@@ -7,7 +7,6 @@ public class Message {
     private double temperature;
     private int interval;
 
-    // Constructor til temperaturbeskeder
     public Message(MessageType type, String clientId, double temperature)
     {
         this.type = type;
@@ -15,13 +14,12 @@ public class Message {
         this.temperature = temperature;
     }
 
-    // Constructor til intervalbeskeder
     public Message(MessageType type, int interval)
     {
         this.type = type;
         this.interval = interval;
     }
-    // Broadcast constructor
+
     public Message(
             MessageType type,
             String clientId)

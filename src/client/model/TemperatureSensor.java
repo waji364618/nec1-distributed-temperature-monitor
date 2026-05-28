@@ -3,9 +3,7 @@ package client.model;
 public class TemperatureSensor {
 
     private String sensorId;
-
     private double temperature;
-
     private int interval;
 
     public TemperatureSensor(

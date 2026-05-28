@@ -8,13 +8,9 @@ import javafx.scene.control.ListView;
 
 public class MainMenuViewModel implements SocketListener {
 
-    // Socket manager reference
+
     private ClientSocketManager socketManager;
-
-    // Thread used for socket connection
     private Thread currentThread;
-
-    // References to JavaFX controls
     private ListView<String> temperatureList;
     private Label averageLabel;
     private Label highestLabel;
@@ -32,14 +28,14 @@ public class MainMenuViewModel implements SocketListener {
             Label measurementLabel,
             Label warningLabel)
     {
-        // Save JavaFX references
+
         this.temperatureList = temperatureList;
         this.averageLabel = averageLabel;
         this.highestLabel = highestLabel;
         this.measurementLabel = measurementLabel;
         this.warningLabel = warningLabel;
 
-        // Create thread for socket communication
+
         currentThread = new Thread(() ->
         {
             socketManager = new ClientSocketManager("localhost", 6789, sensorId, this);});
@@ -52,8 +48,7 @@ public class MainMenuViewModel implements SocketListener {
     }
 
 
-     // Disconnects from server safely.
-    public void disconnect()
+      public void disconnect()
     {
         if (socketManager != null)
         {
@@ -79,8 +74,7 @@ public class MainMenuViewModel implements SocketListener {
     }
 
 
-    //Called when interval changes.
-    @Override
+     @Override
     public void onIntervalChanged(int newInterval)
     {
         Platform.runLater(() ->
@@ -90,7 +84,7 @@ public class MainMenuViewModel implements SocketListener {
     }
 
 
-   // Called if connection is lost.
+
     @Override
     public void onConnectionLost()
     {
@@ -108,14 +102,26 @@ public class MainMenuViewModel implements SocketListener {
     {
         Platform.runLater(() ->
         {
-            // Add temperature to list
+
             temperatureList.getItems().add("Temperature: " + temperature);
 
-            // Update statistics labels
+
             averageLabel.setText(String.valueOf(Math.round(average * 100.0) / 100.0));
 
             highestLabel.setText(String.valueOf(highest));
 
-            measurementLabel.setText(String.valueOf(measurements));});
+            measurementLabel.setText(String.valueOf(measurements));
+
+        /*
+         * Reset warning text when
+         * temperature becomes stable.
+         */
+        if (temperature < 25)
+        {
+            warningLabel.setText("");
+        }
+    });
+
+
     }
 }

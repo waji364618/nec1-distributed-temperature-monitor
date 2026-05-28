@@ -21,43 +21,28 @@ import java.util.Random;
  */
 public class ClientSocketManager {
 
-    // Socket connection
-    private Socket socket;
 
-    // Input and output streams
+    private Socket socket;
     private BufferedReader in;
     private PrintWriter out;
 
-    // Controls thread execution
     private boolean running = true;
-
-    // Temperature sensor model
     private TemperatureSensor sensor;
-
-    // Statistics model
     private SensorStatistics statistics;
-
-    // Listener used for communication
-    // with the ViewModel
     private SocketListener listener;
 
-    /*
-     * Constructor creates connection
-     * to server and starts threads.
-     */
+
     public ClientSocketManager(
             String host,
             int port,
             String sensorId,
-            SocketListener listener)
-    {
+            SocketListener listener) {
         this.listener = listener;
 
         System.out.println("Connecting to server...");
 
-        try
-        {
-            // Create socket connection
+        try {
+
             socket = new Socket(host, port);
 
             System.out.println("Connected to server!");
@@ -80,39 +65,38 @@ public class ClientSocketManager {
              */
             Thread listenerThread = new Thread(() ->
             {
-                try
-                {
-                    while (running)
-                    {
+                try {
+                    while (running) {
                         String response = in.readLine();
 
-                        // Connection closed
-                        if (response == null)
-                        {
+
+                        if (response == null) {
                             break;
                         }
 
                         Message serverMessage = JsonUtil.fromJson(response);
 
-                        // Broadcast message
-                        if (serverMessage.getType() == MessageType.BROADCAST)
-                        {
+
+                        //Broadcast message received.
+                        if (serverMessage.getType() == MessageType.BROADCAST) {
+                            System.out.println("Broadcast received: " + serverMessage.getClientId());
+
                             listener.onBroadcastReceived(serverMessage.getClientId());
                         }
 
-                        // Interval update
-                        else if (serverMessage.getType() == MessageType.CHANGE_INTERVAL)
-                        {
+
+                        // Server changed sensor interval.
+
+                        else if (serverMessage.getType() == MessageType.CHANGE_INTERVAL) {
                             sensor.setInterval(serverMessage.getInterval());
+
+                            System.out.println("Interval changed to: " + sensor.getInterval() + " ms");
 
                             listener.onIntervalChanged(sensor.getInterval());
                         }
                     }
-                }
-                catch (IOException e)
-                {
-                    if (running)
-                    {
+                } catch (IOException e) {
+                    if (running) {
                         listener.onConnectionLost();
                     }
                 }
@@ -126,8 +110,7 @@ public class ClientSocketManager {
              * Main loop for sending
              * temperature data to server.
              */
-            while (running)
-            {
+            while (running) {
                 // Generate random temperature
                 double temperature = Math.round((15 + random.nextDouble() * 15) * 100.0) / 100.0;
 
@@ -142,13 +125,9 @@ public class ClientSocketManager {
                         statistics.getHighestTemperature(),
                         statistics.getMeasurementCount());
 
-                // Create message
-                Message message = new Message(
-                                MessageType.TEMPERATURE,
-                                sensor.getSensorId(),
-                                sensor.getTemperature());
 
-                // Convert to JSON
+                Message message = new Message(MessageType.TEMPERATURE, sensor.getSensorId(), sensor.getTemperature());
+
                 String json = JsonUtil.toJson(message);
 
                 // Send to server
@@ -159,13 +138,9 @@ public class ClientSocketManager {
                 // Wait before next measurement
                 Thread.sleep(sensor.getInterval());
             }
-        }
-        catch (IOException e)
-        {
+        } catch (IOException e) {
             System.out.println("Failed to connect to server.");
-        }
-        catch (InterruptedException e)
-        {
+        } catch (InterruptedException e) {
             System.out.println("Thread interrupted.");
         }
     }
@@ -174,31 +149,24 @@ public class ClientSocketManager {
      * Safely disconnects client
      * from server.
      */
-    public void disconnect()
-    {
+    public void disconnect() {
         running = false;
 
-        try
-        {
-            if (in != null)
-            {
+        try {
+            if (in != null) {
                 in.close();
             }
 
-            if (out != null)
-            {
+            if (out != null) {
                 out.close();
             }
 
-            if (socket != null)
-            {
+            if (socket != null) {
                 socket.close();
             }
 
             System.out.println("Disconnected from server.");
-        }
-        catch (IOException e)
-        {
+        } catch (IOException e) {
             System.out.println("Failed to close connection.");
         }
     }

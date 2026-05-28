@@ -6,21 +6,20 @@ public class SensorStatistics {
     private double totalTemperature;
     private double highestTemperature;
 
-    // Tilføjer ny temperatur
+
     public synchronized void addTemperature(double temperature)
     {
         measurementCount++;
 
         totalTemperature += temperature;
 
-        // Opdater højeste temperatur
-        if (temperature > highestTemperature)
+              if (temperature > highestTemperature)
         {
             highestTemperature = temperature;
         }
     }
 
-    public double getAverageTemperature()
+    public synchronized double getAverageTemperature()
     {
         if (measurementCount == 0)
         {
@@ -30,12 +29,12 @@ public class SensorStatistics {
         return totalTemperature / measurementCount;
     }
 
-    public double getHighestTemperature()
+    public synchronized  double getHighestTemperature()
     {
         return highestTemperature;
     }
 
-    public int getMeasurementCount()
+    public synchronized  int getMeasurementCount()
     {
         return measurementCount;
     }

@@ -7,9 +7,6 @@ public class SensorStatistics {
     private double totalTemperature;
     private double highestTemperature;
 
-
-     // Tilføjer ny temperatur til statistik
-
     public synchronized void addTemperature(double temperature)
     {
         measurementCount++;
